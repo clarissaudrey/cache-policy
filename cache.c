@@ -4,6 +4,7 @@
 #include "cache.h"
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /*
  * Initialize a new cache set with the given associativity and block
@@ -84,7 +85,7 @@ cache_t *cache_new(size_t num_blocks, size_t block_size,
 static int cache_line_check_validity_and_tag(cache_line_t *cache_line, intptr_t tag) {
   
   /* TO BE COMPLETED BY THE STUDENT */
-  return 0; // Added to remove warning; remove once function is implemented.
+  return ((!cache_line->is_valid) || cache_line->tag != tag)? 0 : 1;
 }
 
 /*
@@ -93,7 +94,9 @@ static int cache_line_check_validity_and_tag(cache_line_t *cache_line, intptr_t 
 static long cache_line_retrieve_data(cache_line_t *cache_line, size_t offset) {
   
   /* TO BE COMPLETED BY THE STUDENT */
-  return 0; // Added to remove warning; remove once function is implemented.
+  long dataVal;
+  memcpy(&dataVal, (void *)& (cache_line->data[offset]), sizeof(long));
+  return dataVal;
 }
 
 /*
@@ -128,6 +131,13 @@ static cache_line_t *cache_set_find_matching_line(cache_t *cache, cache_set_t *c
   /* Don't forget to call cache_line_make_mru(cache_set, i) if you
    * find a matching cache line.
    */
+  int i=0;
+  while(i < cache->associativity) {
+    if(cache_line_check_validity_and_tag(cache_set->cache_lines[i],tag)) {
+      return cache_line_make_mru(cache_set,i);
+    }
+    i++;
+  }
   return NULL; // Added to remove warning; remove once function is implemented.
 }
 
@@ -143,7 +153,21 @@ static cache_line_t *find_available_cache_line(cache_t *cache, cache_set_t *cach
   /* Don't forget to call cache_line_make_mru(cache_set, i) once you
    * have selected the cache line to use.
    */
-  return NULL; // Added to remove warning; remove once function is implemented.
+  
+  for(unsigned int i=0; i<cache->associativity; i++) {
+    if(cache_set->cache_lines[i]->is_valid) 
+      continue;
+    else
+      return cache_line_make_mru(cache_set,i);
+  }
+  unsigned int line_index;
+  if((cache->policies & CACHE_REPLACEMENTPOLICY_MASK) == CACHE_REPLACEMENTPOLICY_RANDOM) {
+    line_index = (rand() % (cache->associativity));
+  }
+  else { //(cache->policies & CACHE_REPLACEMENTPOLICY_MASK) == CACHE_REPLACEMENTPOLICY_LRU
+    line_index = cache->associativity-1;
+  }
+  return cache_line_make_mru(cache_set,line_index);
 }
 
 /*
@@ -170,7 +194,20 @@ static cache_line_t *cache_set_add(cache_t *cache, cache_set_t *cache_set,
 long cache_read(cache_t *cache, long *address) {
   
   /* TO BE COMPLETED BY THE STUDENT */
-  return 0; // Added to remove warning; remove once function is implemented.
+  uintptr_t cacheIndex = ((uintptr_t)address >> cache->cache_index_shift) & cache->cache_index_mask;
+  uintptr_t cacheTag = (uintptr_t)address >> (cache->tag_shift);
+  
+  cache_line_t *findMatchLine = cache_set_find_matching_line(cache,&(cache->sets[cacheIndex]),cacheTag);
+  if (findMatchLine != NULL){
+    cache->access_count += 1;
+    return cache_line_retrieve_data(findMatchLine, (uintptr_t)address & cache->block_offset_mask);
+  }
+  else {
+    cache->access_count += 1;
+    cache->miss_count += 1;
+    findMatchLine = cache_set_add(cache,&(cache->sets[cacheIndex]),(uintptr_t)address,cacheTag);
+    return cache_line_retrieve_data(findMatchLine, (uintptr_t)address & cache->block_offset_mask);
+  }
 }
 
 /*
