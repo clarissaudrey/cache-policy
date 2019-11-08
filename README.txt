@@ -63,37 +63,36 @@ Two-way set-associative means two cache lines per set, so we have 32 sets (of 2 
 e) Miss rate = 1.00
 Four-way set-associative means four cache lines per set, so we have 16 sets (of 4 blocks each). sumB will access array in column major order, first it needs a[0][0] (a miss, copy the whole 32 bytes set), then it needs a[1][0] (a miss, copy the whole 32 bytes set), and same with a[2][0] and a[3][0]. All of them will map to same set (set 0 for exact) but different lines, because LRU policy makes sure a cache line will not be removed until all of the elements are used. However, when you access a[4][0] and a[5][0], they will replace the lines in set 0 that contain a[0][0] and a[1][0] (least recently used). This means when you need a[0][1] and a[1][1], it will be another misses. So both data blocks will be copied onto the lines that contain a[2][0] and a[3][0] (which contain data that will be accessed right after). Therefore, the lines that contain data that will be accessed next will always be replaced by the currently needed block, hence all become cache misses. So, for every 6 access counts, 6 are miss counts.
 
-f) Miss rate = 	1.00 (worst case), 0.50 (best case)
-Four-way set-associative means four cache lines per set, so we have 16 sets (of 4 blocks each). sumB will access the array in column major order. So, similar to case (e), the worst case is when each line chosen for replacement is the same as if we use LRU policy. So worst case will have 100% miss rate. For the best case, everytime we need to replace a line in a set, we assume that the line chosen is the line we just recently accessed. Example: we copy data block of a[0][0], a[1][0], a[2][0], a[3][0] (cold misses to set 0, different lines all). Then we copied a[4][0] replacing data block of a[3][0] and a[5][0] replacing the data block of a[4][0], so the next items that we need are a[0][1], a[1][1], and a[2][1], the data will be in cache already. And so on. If we continue this way, at first we'll have all misses, and then when we go to the next line, there will be one more hit each time, until the ned we'll have only 1 miss. Consider the whole case together, the best case will be 50% miss rate.
-
+f) Miss rate = 	1.00 (worst case), 0.5 (best case)
+Four-way set-associative means four cache lines per set, so we have 16 sets (of 4 blocks each). sumB will access the array in column major order. So, similar to case (e), the worst case is when each line chosen for replacement is the same as if we use LRU policy. So worst case will have 100% miss rate. 
+For the best case, we use MRU (most recently used) policy, so if we ever need to replace a line, it will be the line that we just accessed. First, we copy data block of a[0][0], a[1][0], a[2][0], a[3][0] (cold misses to set 0, different lines all). Then we copied a[4][0] replacing data block of a[3][0] and a[5][0] replacing the data block of a[4][0], so the next items that we need are a[0][1], a[1][1], and a[2][1], the data will be in cache already. Then data block of a[3][1] will replace data block of a[2][0], data block of a[4][1] will replace data block of a[3][1], then data block of a[5][1] will replace data block of a[4][1]. If we continue to replace the line that we just recently accessed, let say until a[5][3] (last element we will access in set 1 for the first round), then out of 24 accesses, we will have 12 misses. Repeat for other sets.
 
 g) Miss rate = 0.25
 Direct mapping means one cache line per set, so we have 64 sets. Since we have only 120 columns, assuming a[0][0] is at address 0, then a[1][0] (the 120th element in array) will be at address 120*8 = 960, a[2][0] will be at address 240*8 = 1920, a[3][0] is at address 360*8 = 2880, and so on. So unlike the case in (b), a[2][0] will not replace the line contains a[0][0] (at line 0), but instead it will fill line 60, since 1920/32 = 60 in cache. Also, a[3][0] will fill line 26, a[4][0] will fill line 56, and a[5][0] will fill line 22. Each cache miss will copy the whole set of 4 longs that will be used for the next 3 cache reads (for the other three elements). So, for every 4 access counts, 1 is miss count.
 
 
----------------------------
+-----------------------------------------------
+IMPROVING A PROGRAM'S PERFORMANCE
 
-CHANGES DESCRIPTION:
-
+Changes description:
 mask1: Switched the for-loop order of i and j, and make the j loops outside of i loops. This change was made because the address was represented as [row][column], and it saves a lot of time to loop the rows outside of the columns.
 
 mask2: Combined the ones with the same j loop.
 
 mask3: Got rid of the variable row and col. Rearranged the content inside each j loop to make sure it only has 1 i loop inside. Moved the special cases i.e. i=0 and i=col-1 out, and then loop from 1 to cols-2. Less for loops means faster process.
 
-mask4: First, I did same thing to j loops as what I did to i loops in mask 3: rearrange to reduce the number of loops. Then I combined the lines doing computation to the same object to shorten the number of lines. After that, It's easy to see that the i loops are duplicated, so I combined them together and reduce the duplications inside. Shorten the duplications inside a line.
+mask4: First, we did same thing to j loops as what we did to i loops in mask 3: rearrange to reduce the number of loops. Then combined the lines doing computation to the same object to shorten the number of lines. After that, it's easy to see that the i loops are duplicated, so combine them together and reduce the duplications inside. Shorten the duplications inside a line.
 
 mask5: Convert the initiation and finalizing functions the same way and combine them with existing functions. Replace the weight[j][i] in newImage[j][i] by its calculation.
 
 
-OPTIMIZED RESULT:
-
+Optimized results:
 mask0		2801485		1.00
 mask1		558627		0.19
 mask2		529909		0.189
 mask3		510482		0.178
-mask4       254598      0.09
-mask5       117192      0.041
+mask4       	254598      	0.09
+mask5       	117192      	0.041
 
 
 
