@@ -403,7 +403,6 @@ static inline long mask5(long oldImage[N][N], long newImage[N][N], int rows, int
 
     int i, j;
     long check = 0;
-    
 
 
     newImage[0][0] = (WEIGHT_CENTRE * oldImage[0][0] +
